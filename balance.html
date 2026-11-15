@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رصيد المحفظة - مركز وار لخدمات الإنترنت</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#0f172a',
+                        cardDark: '#1e293b',
+                        lightBg: '#f8fafc',
+                        cardLight: '#ffffff'
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style> 
+        body { font-family: 'Tajawal', sans-serif; } 
+    </style>
+</head>
+<body class="bg-lightBg text-slate-800 dark:bg-darkBg dark:text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- شاشة تسجيل الدخول السريعة (تظهر في حال عدم وجود توكن) -->
+    <div id="login-card" class="bg-cardLight dark:bg-cardDark border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-2xl w-full max-w-md space-y-6">
+        <div class="text-center space-y-2">
+            <div class="w-16 h-16 bg-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg">
+                <span class="text-white text-3xl font-black">W</span>
+            </div>
+            <h2 class="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400">تسجيل الدخول للمحفظة</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">أدخل بيانات الاعتماد لعرض رصيد المحفظة</p>
+        </div>
+        <form id="login-form" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold mb-1">اسم المستخدم / البريد</label>
+                <input type="text" id="ftth-email" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-base focus:outline-none focus:border-indigo-500" required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold mb-1">كلمة المرور</label>
+                <input type="password" id="ftth-password" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-base focus:outline-none focus:border-indigo-500" required>
+            </div>
+            <button type="submit" id="login-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3.5 rounded-xl font-bold text-base shadow-lg transition">عرض الرصيد</button>
+        </form>
+    </div>
+
+    <!-- بطاقة عرض الرصيد المباشر -->
+    <div id="balance-card" class="hidden bg-cardLight dark:bg-cardDark border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-2xl w-full max-w-md text-center space-y-6">
+        <div class="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl mx-auto flex items-center justify-center text-emerald-500 text-3xl">
+            💰
+        </div>
+        <div class="space-y-2">
+            <h2 class="text-xl font-black text-slate-700 dark:text-slate-200">الرصيد الحالي المتاح</h2>
+            <div id="balance-display" class="text-4xl font-black text-emerald-500 py-4">جاري الجلب...</div>
+        </div>
+        <div class="pt-4 flex gap-3">
+            <button onclick="fetchBalance()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-bold text-xs shadow transition">تحديث الرصيد 🔄</button>
+            <button onclick="logout()" class="bg-rose-500/10 text-rose-500 border border-rose-500/20 px-5 py-3 rounded-xl font-bold text-xs">خروج</button>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('ftth_token') || '';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (authToken) {
+                document.getElementById('login-card').classList.add('hidden');
+                document.getElementById('balance-card').classList.remove('hidden');
+                fetchBalance();
+            }
+        });
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-2xl text-xs font-extrabold text-white transition-all duration-300 ${type === 'error' ? 'bg-rose-600' : 'bg-indigo-600'}`; toast.innerText = message; container.appendChild(toast); setTimeout(() => toast.remove(), 3000); }  function getAccountIdFromToken(token) { try { const base64Url = token.split('.')[1]; const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/'); const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) { return '\%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); const payload = JSON.parse(jsonPayload); return payload.AccountId \vert{}\vert{} payload.sub \vert{}\vert{} '16909'; } catch (e) { return '16909'; } }  document.getElementById('login-form').addEventListener('submit', async (e) => { e.preventDefault(); const btn = document.getElementById('login-btn'); btn.innerText = 'جاري التحقق...'; btn.disabled = true;  try { const res = await fetch('/api/ftth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: document.getElementById('ftth-email').value, password: document.getElementById('ftth-password').value }) }); const data = await res.json(); const rawToken = data.access_token \vert{}\vert{} data.token \vert{}\vert{} data.accessToken;  if (res.ok && rawToken) { authToken = rawToken.startsWith('Bearer ') ? rawToken : `Bearer ${rawToken}`;
+                    localStorage.setItem('ftth_token', authToken);
+                    document.getElementById('login-card').classList.add('hidden');
+                    document.getElementById('balance-card').classList.remove('hidden');
+                    fetchBalance();
+                } else {
+                    showToast(data.message || data.error || "فشل تسجيل الدخول", "error");
+                    btn.innerText = 'عرض الرصيد';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showToast("خطأ في الاتصال بالسيرفر", "error");
+                btn.innerText = 'عرض الرصيد';
+                btn.disabled = false;
+            }
+        });
+
+        async function fetchBalance() {
+            const displayEl = document.getElementById('balance-display');
+            displayEl.innerText = 'جاري جلب الرصيد...';
+
+            try {
+                const cleanToken = authToken.replace('Bearer ', '');
+                const accountId = getAccountIdFromToken(cleanToken);
+
+                const res = await fetch(`/api/ftth/wallet/${accountId}`, { headers: { 'Authorization': authToken } });  if (res.status === 401) { showToast("انتهت صلاحية الجلسة، يرجى إعادة تسجيل الدخول", "error"); logout(); return; }  if (res.ok) { const data = await res.json(); // استخراج قيمة الرصيد بحسب صيغة الـ API let balanceVal = 0; if (data.balance !== undefined) balanceVal = data.balance; else if (data.value !== undefined) balanceVal = data.value; else if (typeof data === 'number') balanceVal = data; else if (data.model?.balance !== undefined) balanceVal = data.model.balance;  displayEl.innerText = `${Number(balanceVal).toLocaleString()} د.ع`;
+                } else {
+                    displayEl.innerText = 'تعذر جلب الرصيد';
+                    showToast("فشل جلب رصيد المحفظة", "error");
+                }
+            } catch (e) {
+                displayEl.innerText = 'خطأ في الاتصال';
+                showToast("حدث خطأ أثناء الاتصال بالخادم", "error");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('ftth_token');
+            location.reload();
+        }
+    </script>
+</body>
+</html>
